@@ -1,0 +1,482 @@
+[
+    {
+        "id": "b76378b697bed2cd",
+        "type": "tab",
+        "label": "Flujo InfraGuard NodeRed",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "3ddb89d81a1f7271",
+        "type": "postgresql",
+        "z": "b76378b697bed2cd",
+        "name": "BD",
+        "query": "SELECT\n    a.id_acceso,\n    a.hash_tarjeta,\n    a.timestamp_acceso,\n    a.estado_autorizacion,\n    u.id_usuario,\n    u.nombre_usuario\nFROM accesos a\nLEFT JOIN tarjetas_rfid t\n    ON t.id_tarjeta = a.id_tarjeta\nLEFT JOIN usuarios u\n    ON u.id_usuario = t.id_usuario\nORDER BY a.id_acceso DESC;",
+        "postgreSQLConfig": "275073b039673249",
+        "split": false,
+        "rowsPerMsg": 1,
+        "outputs": 1,
+        "x": 610,
+        "y": 200,
+        "wires": [
+            [
+                "bc0bfee60f4e5716"
+            ]
+        ]
+    },
+    {
+        "id": "e8e50593281d9234",
+        "type": "http in",
+        "z": "b76378b697bed2cd",
+        "name": "get accesos",
+        "url": "/api/accesos",
+        "method": "get",
+        "upload": false,
+        "skipBodyParsing": false,
+        "swaggerDoc": "",
+        "x": 150,
+        "y": 160,
+        "wires": [
+            [
+                "3ddb89d81a1f7271"
+            ]
+        ]
+    },
+    {
+        "id": "137a54c1686ee153",
+        "type": "http in",
+        "z": "b76378b697bed2cd",
+        "name": "post accesos",
+        "url": "/api/accesos",
+        "method": "post",
+        "upload": false,
+        "skipBodyParsing": false,
+        "swaggerDoc": "",
+        "x": 70,
+        "y": 320,
+        "wires": [
+            [
+                "d07564b843482e4c"
+            ]
+        ]
+    },
+    {
+        "id": "5271c697a342e48f",
+        "type": "http in",
+        "z": "b76378b697bed2cd",
+        "name": "get tarjeta",
+        "url": "/api/usuarios/por-tarjeta",
+        "method": "get",
+        "upload": false,
+        "skipBodyParsing": false,
+        "swaggerDoc": "",
+        "x": 120,
+        "y": 440,
+        "wires": [
+            [
+                "092902242ef00a57"
+            ]
+        ]
+    },
+    {
+        "id": "fea0151f40196b51",
+        "type": "http response",
+        "z": "b76378b697bed2cd",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 1130,
+        "y": 260,
+        "wires": []
+    },
+    {
+        "id": "d07564b843482e4c",
+        "type": "function",
+        "z": "b76378b697bed2cd",
+        "name": "insert acceso",
+        "func": "const datos = msg.payload;\n\nmsg.query = `\n    INSERT INTO accesos (\n        id_tarjeta,\n        hash_tarjeta,\n        timestamp_acceso,\n        estado_autorizacion\n    )\n    VALUES (\n        (SELECT id_tarjeta FROM tarjetas_rfid WHERE hash_tarjeta = $1),\n        $1, $2, $3\n    )\n    RETURNING id_acceso;\n`;\n\nmsg.params = [\n    datos.hash_tarjeta.trim(),\n    datos.timestamp_acceso,\n    datos.estado_autorizacion\n];\n\nreturn [msg, null];",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 370,
+        "y": 300,
+        "wires": [
+            [
+                "826e41afde2c2e3c"
+            ],
+            [
+                "47ef1dfd6417bc8a"
+            ]
+        ]
+    },
+    {
+        "id": "566c41428aa53aa6",
+        "type": "function",
+        "z": "b76378b697bed2cd",
+        "name": "validacion",
+        "func": "\nmsg.statusCode = 201;\nmsg.payload = Array.isArray(msg.payload)\n    ? msg.payload[0]\n    : msg.payload;\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 860,
+        "y": 300,
+        "wires": [
+            [
+                "fea0151f40196b51"
+            ]
+        ]
+    },
+    {
+        "id": "092902242ef00a57",
+        "type": "function",
+        "z": "b76378b697bed2cd",
+        "name": "select tarjeta",
+        "func": "const hash = msg.req.query.hash;\n\nif (typeof hash !== \"string\" || !hash.trim()) {\n    msg.statusCode = 400;\n    msg.payload = {\n        error: \"Debes enviar el parámetro hash.\"\n    };\n    return [null, msg];\n}\n\nmsg.query = `\n    SELECT\n        u.id_usuario,\n        u.nombre_usuario,\n        u.estado,\n        t.id_tarjeta,\n        t.hash_tarjeta\n    FROM tarjetas_rfid t\n    JOIN usuarios u\n        ON u.id_usuario = t.id_usuario\n    WHERE t.hash_tarjeta = $1\n`;\n\nmsg.params = [hash.trim()];\n\nreturn [msg, null];",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 350,
+        "y": 440,
+        "wires": [
+            [
+                "2047198a47d039e3"
+            ],
+            [
+                "42bf66e51d78fb7a"
+            ]
+        ]
+    },
+    {
+        "id": "bd73efe3c54997d3",
+        "type": "function",
+        "z": "b76378b697bed2cd",
+        "name": "validar tarjeta",
+        "func": "const filas = msg.payload;\n\nif (!Array.isArray(filas) || filas.length === 0) {\n    msg.statusCode = 404;\n    msg.payload = {\n        error: \"No existe una tarjeta registrada con ese hash.\"\n    };\n    return msg;\n}\n\nmsg.statusCode = 200;\nmsg.payload = filas[0];\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 920,
+        "y": 500,
+        "wires": [
+            [
+                "2deb0ee44a61277e"
+            ]
+        ]
+    },
+    {
+        "id": "826e41afde2c2e3c",
+        "type": "postgresql",
+        "z": "b76378b697bed2cd",
+        "name": "BD",
+        "query": "",
+        "postgreSQLConfig": "275073b039673249",
+        "split": false,
+        "rowsPerMsg": 1,
+        "outputs": 1,
+        "x": 610,
+        "y": 300,
+        "wires": [
+            [
+                "566c41428aa53aa6"
+            ]
+        ]
+    },
+    {
+        "id": "2047198a47d039e3",
+        "type": "postgresql",
+        "z": "b76378b697bed2cd",
+        "name": "BD",
+        "query": "SELECT\n    a.id_acceso,\n    a.hash_tarjeta,\n    a.timestamp_acceso,\n    a.estado_autorizacion,\n    u.id_usuario,\n    u.nombre_usuario\nFROM accesos a\nLEFT JOIN tarjetas_rfid t\n    ON t.id_tarjeta = a.id_tarjeta\nLEFT JOIN usuarios u\n    ON u.id_usuario = t.id_usuario\nORDER BY a.id_acceso DESC;",
+        "postgreSQLConfig": "275073b039673249",
+        "split": false,
+        "rowsPerMsg": 1,
+        "outputs": 1,
+        "x": 590,
+        "y": 420,
+        "wires": [
+            [
+                "bd73efe3c54997d3"
+            ]
+        ]
+    },
+    {
+        "id": "bc0bfee60f4e5716",
+        "type": "http response",
+        "z": "b76378b697bed2cd",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 1110,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "2deb0ee44a61277e",
+        "type": "http response",
+        "z": "b76378b697bed2cd",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 1110,
+        "y": 500,
+        "wires": []
+    },
+    {
+        "id": "0c9439195fdf65e4",
+        "type": "mqtt in",
+        "z": "b76378b697bed2cd",
+        "name": "",
+        "topic": "acceso/tarjeta/consulta",
+        "qos": "0",
+        "datatype": "auto-detect",
+        "broker": "8db05a903fd0858d",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 120,
+        "y": 560,
+        "wires": [
+            [
+                "38c73482ee34e354"
+            ]
+        ]
+    },
+    {
+        "id": "968ea4e7339dc67e",
+        "type": "mqtt out",
+        "z": "b76378b697bed2cd",
+        "name": "mqtt respuesta",
+        "topic": "acceso/tarjeta/respuesta",
+        "qos": "0",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "8db05a903fd0858d",
+        "x": 1260,
+        "y": 640,
+        "wires": []
+    },
+    {
+        "id": "dcc36491def4c5be",
+        "type": "function",
+        "z": "b76378b697bed2cd",
+        "name": "select tarjeta",
+        "func": "const hash = msg.payload?.hash;\n\nif (typeof hash !== \"string\" || !hash.trim()) {\n    msg.topic = \"acceso/tarjeta/respuesta\";\n    msg.payload = JSON.stringify({\n        error: \"Falta el hash de la tarjeta\"\n    });\n    return [null, msg];\n}\n\n// NUEVO: Guardamos el hash intacto en una variable segura para usarlo luego\nmsg.hash_original = hash.trim();\n\nmsg.query = `\n    SELECT\n        u.id_usuario,\n        u.nombre_usuario,\n        u.estado,\n        t.id_tarjeta,\n        t.hash_tarjeta\n    FROM tarjetas_rfid t\n    JOIN usuarios u ON u.id_usuario = t.id_usuario\n    WHERE t.hash_tarjeta = $1\n`;\n\nmsg.params = [hash.trim()];\nmsg.topic = \"acceso/tarjeta/respuesta\";\n\nreturn [msg, null];",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 470,
+        "y": 560,
+        "wires": [
+            [
+                "5b9a45ae8d3d7fed"
+            ],
+            [
+                "968ea4e7339dc67e"
+            ]
+        ]
+    },
+    {
+        "id": "5b9a45ae8d3d7fed",
+        "type": "postgresql",
+        "z": "b76378b697bed2cd",
+        "name": "BD",
+        "query": "SELECT\n    a.id_acceso,\n    a.hash_tarjeta,\n    a.timestamp_acceso,\n    a.estado_autorizacion,\n    u.id_usuario,\n    u.nombre_usuario\nFROM accesos a\nLEFT JOIN tarjetas_rfid t\n    ON t.id_tarjeta = a.id_tarjeta\nLEFT JOIN usuarios u\n    ON u.id_usuario = t.id_usuario\nORDER BY a.id_acceso DESC;",
+        "postgreSQLConfig": "275073b039673249",
+        "split": false,
+        "rowsPerMsg": 1,
+        "outputs": 1,
+        "x": 670,
+        "y": 640,
+        "wires": [
+            [
+                "15424274d403774c"
+            ]
+        ]
+    },
+    {
+        "id": "15424274d403774c",
+        "type": "function",
+        "z": "b76378b697bed2cd",
+        "name": "validar tarjeta",
+        "func": "const filas = msg.payload;\n\nlet respuesta;\n\nif (!Array.isArray(filas) || filas.length === 0) {\n    respuesta = {\n        error: \"Tarjeta no registrada\"\n    };\n} else {\n    respuesta = filas[0];\n}\n\nmsg.topic = \"acceso/tarjeta/respuesta\";\nmsg.payload = JSON.stringify(respuesta);\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 860,
+        "y": 660,
+        "wires": [
+            [
+                "968ea4e7339dc67e",
+                "84c17609ae395b36"
+            ]
+        ]
+    },
+    {
+        "id": "38c73482ee34e354",
+        "type": "json",
+        "z": "b76378b697bed2cd",
+        "name": "",
+        "property": "payload",
+        "action": "obj",
+        "pretty": false,
+        "x": 310,
+        "y": 560,
+        "wires": [
+            [
+                "dcc36491def4c5be"
+            ]
+        ]
+    },
+    {
+        "id": "47ef1dfd6417bc8a",
+        "type": "http response",
+        "z": "b76378b697bed2cd",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 730,
+        "y": 360,
+        "wires": []
+    },
+    {
+        "id": "42bf66e51d78fb7a",
+        "type": "http response",
+        "z": "b76378b697bed2cd",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 650,
+        "y": 520,
+        "wires": []
+    },
+    {
+        "id": "84c17609ae395b36",
+        "type": "function",
+        "z": "b76378b697bed2cd",
+        "name": "Persiste",
+        "func": "// 1. Forzamos los headers para que tu API interna lo lea bien\nmsg.headers = { \"Content-Type\": \"application/json\" };\n\n// 2. Leemos la respuesta que armó el nodo anterior\nlet respuesta_mqtt = JSON.parse(msg.payload);\n\n// 3. Recuperamos el hash que salvamos al principio\nlet hash = msg.hash_original || \"desconocido\";\n\n// 4. Si el JSON que va al ESP32 tiene \"error\", el acceso es denegado\nlet estado = respuesta_mqtt.error ? \"NO_AUTORIZADO\" : \"AUTORIZADO\";\n\n// 5. Armamos el body para el POST\nmsg.payload = {\n    \"hash_tarjeta\": hash,\n    \"timestamp_acceso\": new Date().toISOString(),\n    \"estado_autorizacion\": estado\n};\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1040,
+        "y": 780,
+        "wires": [
+            [
+                "835eae4ddcfd6f3e"
+            ]
+        ]
+    },
+    {
+        "id": "835eae4ddcfd6f3e",
+        "type": "http request",
+        "z": "b76378b697bed2cd",
+        "name": "",
+        "method": "POST",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://127.0.0.1:1880/api/accesos",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 1250,
+        "y": 780,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "275073b039673249",
+        "type": "postgreSQLConfig",
+        "name": "",
+        "host": "127.0.0.1",
+        "hostFieldType": "str",
+        "port": 5432,
+        "portFieldType": "num",
+        "database": "Rack_Smart",
+        "databaseFieldType": "str",
+        "ssl": "false",
+        "sslFieldType": "bool",
+        "applicationName": "",
+        "applicationNameType": "str",
+        "max": 10,
+        "maxFieldType": "num",
+        "idle": 1000,
+        "idleFieldType": "num",
+        "connectionTimeout": 10000,
+        "connectionTimeoutFieldType": "num",
+        "userFieldType": "cred",
+        "userEnv": "",
+        "passwordFieldType": "cred",
+        "passwordEnv": ""
+    },
+    {
+        "id": "8db05a903fd0858d",
+        "type": "mqtt-broker",
+        "name": "mosquitto",
+        "broker": "localhost",
+        "port": 1883,
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "3",
+        "keepalive": 60,
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "d20c4cd2f8e8f4b5",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-contrib-postgresql": "0.16.2"
+        }
+    }
+]
