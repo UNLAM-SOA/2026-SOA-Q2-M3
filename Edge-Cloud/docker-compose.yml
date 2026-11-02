@@ -11,7 +11,7 @@ services:
       - infraguard_net
 
   postgres:
-    image: postgres:18-alpine
+    image: postgres:17-alpine
     container_name: infraguard_db
     restart: unless-stopped
     environment:
@@ -36,7 +36,6 @@ services:
       - TZ=America/Argentina/Buenos_Aires
     volumes:
       - nodered_data:/data
-      - ./Node-Red/flows.json:/data/flows.json
     entrypoint: >
       /bin/sh -c "npm install --prefix /data node-red-contrib-postgresql@0.16.2 &&
       npm --no-update-notifier --no-fund start --cache /data/.npm -- --userDir /data"
