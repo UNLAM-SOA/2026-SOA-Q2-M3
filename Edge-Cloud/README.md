@@ -11,12 +11,12 @@ Puede incluir:
 - Configuración de brokers.
 
 
-##Requisitos para la puesta en marcha
+## Requisitos para la puesta en marcha
 
 * [Docker](https://www.docker.com/) y Docker Compose instalados.
 * Entorno de terminal compatible (WSL2 en Windows, Linux o macOS).
 
-##Puesta en Marcha
+## Puesta en Marcha
 
 ### 1. Levantar la Infraestructura
 Clona este repositorio, abrir una terminal en la raíz del proyecto y ejecutar el siguiente comando para construir e iniciar los contenedores en segundo plano:
