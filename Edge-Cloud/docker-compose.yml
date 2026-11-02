@@ -6,7 +6,7 @@ services:
     ports:
       - "1883:1883"
     volumes:
-      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./MQTT/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
     networks:
       - infraguard_net
 
@@ -22,12 +22,12 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./postgres/01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./PostgreSQL/Rack_Smart_BD.sql:/docker-entrypoint-initdb.d/01_Rack_Smart_BD.sql:ro
     networks:
       - infraguard_net
 
   nodered:
-    build: ./nodered
+    image: nodered/node-red:latest
     container_name: infraguard_nodered
     restart: unless-stopped
     ports:
@@ -36,6 +36,10 @@ services:
       - TZ=America/Argentina/Buenos_Aires
     volumes:
       - nodered_data:/data
+      - ./Node-Red/flows.json:/data/flows.json
+    entrypoint: >
+      /bin/sh -c "npm install --prefix /data node-red-contrib-postgresql@0.16.2 &&
+      npm --no-update-notifier --no-fund start --cache /data/.npm -- --userDir /data"
     depends_on:
       - mosquitto
       - postgres
