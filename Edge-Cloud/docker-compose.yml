@@ -1,0 +1,51 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: infraguard_mqtt
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    networks:
+      - infraguard_net
+
+  postgres:
+    image: postgres:18-alpine
+    container_name: infraguard_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: Rack_Smart
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    networks:
+      - infraguard_net
+
+  nodered:
+    build: ./nodered
+    container_name: infraguard_nodered
+    restart: unless-stopped
+    ports:
+      - "1880:1880"
+    environment:
+      - TZ=America/Argentina/Buenos_Aires
+    volumes:
+      - nodered_data:/data
+    depends_on:
+      - mosquitto
+      - postgres
+    networks:
+      - infraguard_net
+
+volumes:
+  postgres_data:
+  nodered_data:
+
+networks:
+  infraguard_net:
+    driver: bridge
