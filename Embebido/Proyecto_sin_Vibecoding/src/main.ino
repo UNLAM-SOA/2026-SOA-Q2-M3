@@ -10,7 +10,7 @@ void inicializarRecursosRTOS() {
   colaEventos     = xQueueCreate(CAPACIDAD_COLA_RTOS, sizeof(stEvento));
   colaAcciones    = xQueueCreate(CAPACIDAD_COLA_RTOS, sizeof(stAccion));
 
-  timerAcceso     = xTimerCreate("TimerAcceso", pdMS_TO_TICKS(TIEMPO_VFENTANA_ACCESO_MS),   pdFALSE, NULL, callbackTimerAcceso);
+  timerAcceso     = xTimerCreate("TimerAcceso", pdMS_TO_TICKS(TIEMPO_VENTANA_ACCESO_MS),   pdFALSE, NULL, callbackTimerAcceso);
   timerSirena     = xTimerCreate("TimerSirena", pdMS_TO_TICKS(TIEMPO_SIRENA_PWM_MS),       pdTRUE,  NULL, callbackTimerSirena);
   timerMensajeLCD = xTimerCreate("TimerMsgLCD", pdMS_TO_TICKS(TIEMPO_PANTALLA_MENSAJE_MS), pdFALSE, NULL, callbackTimerMensajeLCD);
 }
