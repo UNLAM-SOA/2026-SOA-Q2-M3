@@ -3,84 +3,88 @@
 
 #include <Arduino.h>
 
-//Configuración de Red y Tópicos MQTT
-const char* SSID_WIFI              = "Personal 2.4 GHZ";
-const char* PASSWORD_WIFI          = "00442952504";
-const char* SERVIDOR_MQTT          = "192.168.0.120";
-const int   PUERTO_MQTT            = 1883;
-const char* ID_CLIENTE_MQTT        = "ESP32_InfraGuard";
-const char* TOPIC_MQTT_CONSULTA    = "acceso/tarjeta/consulta";
-const char* TOPIC_MQTT_RESPUESTA   = "acceso/tarjeta/respuesta";
-const char* TOPIC_MQTT_AMBIENTE    = "rack/sensores/ambiente";
+#define SSID_WIFI                       "Personal 2.4 GHZ"
+#define PASSWORD_WIFI                   "00442952504"
+#define SERVIDOR_MQTT                   "192.168.0.121"
+#define PUERTO_MQTT                     1883
+#define ID_CLIENTE_MQTT                 "ESP32_InfraGuard"
+#define TOPIC_MQTT_CONSULTA             "acceso/tarjeta/consulta"
+#define TOPIC_MQTT_RESPUESTA            "acceso/tarjeta/respuesta"
+#define TOPIC_MQTT_AMBIENTE             "rack/sensores/ambiente"
 
-//Definición de Pines del ESP32
-const int PIN_PUERTA               = 14;
-const int PIN_BUZZER               = 27;
-const int PIN_RELE_MOTOR           = 13;
-const int PIN_DHT                  = 15;
-const int PIN_TIRA_LED             = 25;
-const int PIN_RFID_SS              = 5;
-const int PIN_RFID_RST             = 4;
+#define PIN_PUERTA                      14
+#define PIN_BUZZER                      27
+#define PIN_RELE_MOTOR                  13
+#define PIN_DHT                         15
+#define PIN_TIRA_LED                    25
+#define PIN_RFID_SS                     5
+#define PIN_RFID_RST                    4
 
-//Constantes de Tiempos y Sistema
-const unsigned long VELOCIDAD_SERIAL_BAUD       = 115200;
-const uint32_t TIEMPO_VENTANA_ACCESO_MS         = 5000;
-const uint32_t TIEMPO_SIRENA_PWM_MS             = 250;
-const uint32_t TIEMPO_PANTALLA_MENSAJE_MS       = 3000;
-const uint32_t INTERVALO_DHT_MS                 = 2000;
-const uint32_t CADENCIA_SENSORES_MS             = 50;
-const uint32_t INTERVALO_REINTENTO_MQTT_MS      = 3000;
-const uint32_t TIEMPO_ANTIRREBOTE_RFID_MS       = 3000;
-const uint32_t PAUSA_INIT_SERIAL_MS             = 100;
-const uint32_t PAUSA_WIFI_CONEXION_MS           = 500;
-const uint32_t PAUSA_INIT_RFID_MS               = 50;
-const uint32_t PAUSA_TAREA_MQTT_MS              = 50;
-const uint32_t PAUSA_LOOP_IDLE_MS               = 1000;
-const uint32_t PAUSA_BORRADO_LCD_MS             = 5;
-const uint32_t PAUSA_ESTABILIZACION_RGB_MS      = 2;
-const uint32_t TIMEOUT_MUTEX_MQTT_MS            = 200;
-const uint32_t TIMEOUT_POLL_MUTEX_MQTT_MS       = 100;
-const uint16_t TIMEOUT_SOCKET_MQTT_SEG          = 2;
-const TickType_t TIEMPO_NO_BLOQUEANTE           = 0;
+#define VELOCIDAD_SERIAL_BAUD           115200UL
+#define TIEMPO_VENTANA_ACCESO_MS        5000UL
+#define TIEMPO_SIRENA_PWM_MS            250UL
+#define TIEMPO_PANTALLA_MENSAJE_MS      3000UL
+#define INTERVALO_DHT_MS                2000UL
+#define CADENCIA_SENSORES_MS            50UL
+#define INTERVALO_REINTENTO_MQTT_MS     3000UL
+#define TIEMPO_ANTIRREBOTE_RFID_MS      3000UL
+#define PAUSA_INIT_SERIAL_MS            100UL
+#define PAUSA_WIFI_CONEXION_MS          500UL
+#define PAUSA_INIT_RFID_MS              50UL
+#define PAUSA_RESET_FISICO_RFID_MS      10UL
+#define PAUSA_TAREA_MQTT_MS             50UL
+#define PAUSA_LOOP_IDLE_MS              1000UL
+#define PAUSA_BORRADO_LCD_MS            5UL
+#define PAUSA_ESTABILIZACION_RGB_MS     2UL
+#define PAUSA_ESTABILIZACION_LED_MS     15UL
+#define TIMEOUT_MUTEX_MQTT_MS           200UL
+#define TIMEOUT_POLL_MUTEX_MQTT_MS      100UL
+#define TIMEOUT_SOCKET_MQTT_SEG         2U
+#define TIEMPO_NO_BLOQUEANTE            ((TickType_t)0)
 
-//Parámetros de Hardware, Audio, Clima y Pantalla
-const uint16_t CANTIDAD_LEDS_TIRA               = 8;
-const float    UMBRAL_TEMP_MAXIMA_C             = 30.0f;
-const float    TEMP_MIN_VALIDA_C                = -40.0f;
-const float    TEMP_MAX_VALIDA_C                = 85.0f;
-const float    VALOR_ACCION_POR_DEFECTO         = 0.0f;
-const float    VALOR_EVENTO_POR_DEFECTO         = 0.0f;
-const uint32_t FRECUENCIA_SIRENA_AGUDA_HZ       = 1400;
-const uint32_t FRECUENCIA_SIRENA_GRAVE_HZ       = 800;
+#define CANTIDAD_LEDS_TIRA              16
+#define BRILLO_TIRA_LED                 30
+#define UMBRAL_TEMP_MAXIMA_C            30.0f
+#define TEMP_MIN_VALIDA_C               -40.0f
+#define TEMP_MAX_VALIDA_C               85.0f
+#define VALOR_ACCION_POR_DEFECTO        0.0f
+#define VALOR_EVENTO_POR_DEFECTO        0.0f
+#define FRECUENCIA_SIRENA_AGUDA_HZ      1400UL
+#define FRECUENCIA_SIRENA_GRAVE_HZ      800UL
 
-const uint8_t  COLUMNAS_LCD                     = 16;
-const uint8_t  FILAS_LCD                        = 2;
-const uint8_t  FILA_LCD_SUPERIOR                = 0;
-const uint8_t  FILA_LCD_INFERIOR                = 1;
-const uint8_t  COLUMNA_INICIAL_LCD              = 0;
-const size_t   TAMANO_BUFFER_LINEA_LCD          = 17;
-const size_t   INDICE_MAX_CARACTERES_LCD        = 16;
-const char     ASCII_MIN_IMPRIMIBLE             = 32;
-const char     ASCII_MAX_IMPRIMIBLE             = 126;
+#define COLUMNAS_LCD                    16
+#define FILAS_LCD                       2
+#define FILA_LCD_SUPERIOR               0
+#define FILA_LCD_INFERIOR               1
+#define COLUMNA_INICIAL_LCD             0
+#define TAMANO_BUFFER_LINEA_LCD         17
+#define INDICE_MAX_CARACTERES_LCD       16
+#define ASCII_MIN_IMPRIMIBLE            32
+#define ASCII_MAX_IMPRIMIBLE            126
 
-const uint8_t  COLOR_NULO                       = 0;
-const uint8_t  COLOR_MEDIO                      = 128;
-const uint8_t  COLOR_MAXIMO                     = 255;
+#define COLOR_NULO                      0
+#define COLOR_MEDIO                     128
+#define COLOR_MAXIMO                    255
 
-const byte     BYTE_HEX_LIMITE_CERO             = 0x10;
-const byte     REGISTRO_RFID_VACIO_00           = 0x00;
-const byte     REGISTRO_RFID_VACIO_FF           = 0xFF;
-const int      ESTADO_PUERTA_INDEFINIDO         = -1;
+#define BYTE_HEX_LIMITE_CERO            0x10
+#define REGISTRO_RFID_VACIO_00          0x00
+#define REGISTRO_RFID_VACIO_FF          0xFF
+#define MASCARA_ANTENA_RFID             0x03
+#define FRECUENCIA_SPI_RFID_HZ          1000000UL
+#define GANANCIA_MAXIMA_RFID            MFRC522::RxGain_max
+#define ESTADO_PUERTA_INDEFINIDO        -1
+#define MODELO_SENSOR_DHT               DHTesp::DHT11
+#define INDICE_INICIAL_CERO             0
+#define TIEMPO_INICIAL_CERO             0UL
+#define PREFIJO_HEX_CERO                "0"
 
-//Parámetros de Recursos de FreeRTOS
-const UBaseType_t CAPACIDAD_COLA_RTOS           = 20;
-const uint32_t    STACK_TAREA_ESTANDAR          = 4096;
-const UBaseType_t PRIORIDAD_TAREA_CLIMA         = 1;
-const UBaseType_t PRIORIDAD_TAREA_ESTANDAR      = 2;
-const UBaseType_t PRIORIDAD_TAREA_MQTT          = 3;
-const size_t      CAPACIDAD_JSON_MQTT           = 256;
+#define CAPACIDAD_COLA_RTOS             20
+#define STACK_TAREA_ESTANDAR            4096
+#define PRIORIDAD_TAREA_CLIMA           1
+#define PRIORIDAD_TAREA_ESTANDAR        2
+#define PRIORIDAD_TAREA_MQTT            3
+#define CAPACIDAD_JSON_MQTT             256
 
-//Estados del Sistema FSM
 enum eEstadoSistema {
   ESTADO_EMBEDDED_INIT             = 100,
   ESTADO_EMBEDDED_REPOSO           = 200,
@@ -89,7 +93,6 @@ enum eEstadoSistema {
   ESTADO_EMBEDDED_ALERTA_INTRUSION = 500
 };
 
-//Tipos de Eventos (FSM)
 enum eTipoEvento {
   TIPO_EVENTO_TIMEOUT_ACCESO       = 2000,
   TIPO_EVENTO_TARJETA_VALIDA       = 3000,
@@ -105,7 +108,6 @@ enum eTipoEvento {
   TIPO_EVENTO_TICK_SIRENA          = 8000
 };
 
-//Tipos de Acciones sobre Actuadores
 enum eTipoAccion {
   ACCION_RELE_COOLER_ON            = 100,
   ACCION_RELE_COOLER_OFF           = 200,
@@ -125,7 +127,6 @@ enum eTipoAccion {
   ACCION_LCD_SIN_SERVIDOR          = 1600
 };
 
-//Estructuras de Mensajería RTOS
 struct stEvento {
   int   tipo;
   float valor;
@@ -136,7 +137,6 @@ struct stAccion {
   float valor;
 };
 
-//Handlers Globales de FreeRTOS
 QueueHandle_t     colaEventos;
 QueueHandle_t     colaAcciones;
 TimerHandle_t     timerAcceso;
@@ -144,7 +144,6 @@ TimerHandle_t     timerSirena;
 TimerHandle_t     timerMensajeLCD;
 SemaphoreHandle_t mutexMQTT;
 
-//Funciones de encolado seguro entre tareas
 inline void enviarEvento(int tipoEvento, float valor = VALOR_EVENTO_POR_DEFECTO) {
   stEvento evento;
   evento.tipo  = tipoEvento;
@@ -159,4 +158,4 @@ inline void encolarAccion(int tipoAccion, float valor = VALOR_ACCION_POR_DEFECTO
   xQueueSend(colaAcciones, &accion, TIEMPO_NO_BLOQUEANTE);
 }
 
-#endif // CONFIGURACION_H
+#endif
