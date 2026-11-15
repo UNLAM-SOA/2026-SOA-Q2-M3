@@ -77,20 +77,20 @@ docker compose up -d
 
 # Pruebas Postman
 ### POST
-/api/remoto/autorizar --> Envia apertura remota y desactiva la alarma. Devuelve 200 OK
+```/api/remoto/autorizar --> Envia apertura remota y desactiva la alarma. Devuelve 200 OK```
 
-/api/tarjetas --> Da de alta un usuario con UID/HASH RFID. Devuelve 200 OK
+```/api/tarjetas --> Da de alta un usuario con UID/HASH RFID. Devuelve 200 OK```
 
-/api/accesos --> Inserta manualmente un acceso. Devuelve 201 CREADO
+```/api/accesos --> Inserta manualmente un acceso. Devuelve 201 CREADO```
 
 ### GET
-/api/clima --> Devuelve la ultima lectura del DHT11. Devuelve 200 OK
+```/api/clima --> Devuelve la ultima lectura del DHT11. Devuelve 200 OK```
 
-/api/tarjetas --> Lista todos los usuarios. Devuelve 200 OK
+```/api/tarjetas --> Lista todos los usuarios. Devuelve 200 OK```
 
-/api/usuarios/por-tarjeta --> Valida si un hash especifico existe. Devuelve 200 OK o 400 o 404
+```/api/usuarios/por-tarjeta --> Valida si un hash especifico existe. Devuelve 200 OK o 400 o 404```
 
-/api/accesos --> Obtener el historial completo de autorizados y denegados. Devuelve 200 OK
+```/api/accesos --> Obtener el historial completo de autorizados y denegados. Devuelve 200 OK```
 
 
 
