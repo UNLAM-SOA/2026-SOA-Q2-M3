@@ -8,16 +8,42 @@
 Adafruit_NeoPixel tiraLed(CANTIDAD_LEDS_TIRA, PIN_TIRA_LED, NEO_GRB + NEO_KHZ800);
 bool sirenaTonoAgudoActivo = false;
 
+inline void actualizarTiraLedSeguro(uint8_t r, uint8_t g, uint8_t b) {
+  vTaskDelay(pdMS_TO_TICKS(PAUSA_ESTABILIZACION_LED_MS));
+  uint32_t color = tiraLed.Color(r, g, b);
+
+  if (r == COLOR_NULO && g == COLOR_NULO && b == COLOR_NULO) {
+    tiraLed.clear();
+  } else {
+    tiraLed.fill(color);
+  }
+  tiraLed.show();
+
+  vTaskDelay(pdMS_TO_TICKS(PAUSA_ESTABILIZACION_LED_MS));
+  if (r == COLOR_NULO && g == COLOR_NULO && b == COLOR_NULO) {
+    tiraLed.clear();
+  } else {
+    tiraLed.fill(color);
+  }
+  tiraLed.show();
+}
+
 inline void actuadoresInicializarPines() {
   pinMode(PIN_PUERTA, INPUT_PULLUP);
   pinMode(PIN_BUZZER, OUTPUT);
   pinMode(PIN_RELE_MOTOR, OUTPUT);
+  pinMode(PIN_TIRA_LED, OUTPUT);
   digitalWrite(PIN_BUZZER, LOW);
   digitalWrite(PIN_RELE_MOTOR, LOW);
+  digitalWrite(PIN_TIRA_LED, LOW);
 }
 
 inline void actuadoresInicializarNeoPixel() {
   tiraLed.begin();
+  tiraLed.setBrightness(BRILLO_TIRA_LED);
+  tiraLed.clear();
+  tiraLed.show();
+  vTaskDelay(pdMS_TO_TICKS(PAUSA_ESTABILIZACION_LED_MS));
   tiraLed.clear();
   tiraLed.show();
 }
@@ -31,18 +57,15 @@ inline void apagarReleCooler() {
 }
 
 inline void apagarTiraLed() {
-  tiraLed.fill(tiraLed.Color(COLOR_NULO, COLOR_NULO, COLOR_NULO));
-  tiraLed.show();
+  actualizarTiraLedSeguro(COLOR_NULO, COLOR_NULO, COLOR_NULO);
 }
 
 inline void prenderTiraLedBlanco() {
-  tiraLed.fill(tiraLed.Color(COLOR_MAXIMO, COLOR_MAXIMO, COLOR_MAXIMO));
-  tiraLed.show();
+  actualizarTiraLedSeguro(COLOR_MAXIMO, COLOR_MAXIMO, COLOR_MAXIMO);
 }
 
 inline void prenderTiraLedRojo() {
-  tiraLed.fill(tiraLed.Color(COLOR_MAXIMO, COLOR_NULO, COLOR_NULO));
-  tiraLed.show();
+  actualizarTiraLedSeguro(COLOR_MAXIMO, COLOR_NULO, COLOR_NULO);
 }
 
 inline void silenciarBuzzer() {
