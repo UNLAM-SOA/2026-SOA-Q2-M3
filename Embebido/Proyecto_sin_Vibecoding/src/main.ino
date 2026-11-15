@@ -29,11 +29,11 @@ void do_init() {
   Serial.println("\n\n--- Iniciando Sistema Operativo InfraGuard ---");
 
   actuadoresInicializarPines();
+  actuadoresInicializarNeoPixel();
   lcdInicializarHardware();
   wifiInicializarConexion();
   mqttInicializarCliente();
   sensoresInicializarHardware();
-  actuadoresInicializarNeoPixel();
 
   inicializarRecursosRTOS();
   lcdLimpiarSeguro();
