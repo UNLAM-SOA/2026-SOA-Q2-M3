@@ -8,6 +8,45 @@
         "env": []
     },
     {
+        "id": "275073b039673249",
+        "type": "postgreSQLConfig",
+        "name": "Rack_Smart_DB",
+        "host": "postgres",
+        "hostFieldType": "str",
+        "port": 5432,
+        "portFieldType": "num",
+        "database": "Rack_Smart",
+        "databaseFieldType": "str",
+        "ssl": "false",
+        "sslFieldType": "bool",
+        "applicationName": "",
+        "applicationNameType": "str",
+        "max": 10,
+        "maxFieldType": "num",
+        "idle": 1000,
+        "idleFieldType": "num",
+        "connectionTimeout": 10000,
+        "connectionTimeoutFieldType": "num",
+        "userFieldType": "cred",
+        "userEnv": "",
+        "passwordFieldType": "cred",
+        "passwordEnv": ""
+    },
+    {
+        "id": "8db05a903fd0858d",
+        "type": "mqtt-broker",
+        "name": "mosquitto",
+        "broker": "mosquitto",
+        "port": 1883,
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": 60,
+        "cleansession": true,
+        "autoUnsubscribe": true
+    },
+    {
         "id": "3ddb89d81a1f7271",
         "type": "postgresql",
         "z": "b76378b697bed2cd",
@@ -378,7 +417,7 @@
         "type": "function",
         "z": "b76378b697bed2cd",
         "name": "Persiste",
-        "func": "msg.headers = { \"Content-Type\": \"application/json\" };\nlet respuesta_mqtt = JSON.parse(msg.payload);\nlet hash = msg.hash_original || \"desconocido\";\nlet estado = respuesta_mqtt.error ? \"NO_AUTORIZADO\" : \"AUTORIZADO\";\n\nmsg.payload = {\n    \"hash_tarjeta\": hash,\n    \"timestamp_acceso\": new Date().toISOString(),\n    \"estado_autorizacion\": estado\n};\n\nreturn msg;",
+        "func": "msg.headers = { \"Content-Type\": \"application/json\" };\nlet respuesta_mqtt = JSON.parse(msg.payload);\nlet hash = msg.hash_original || \"desconocido\";\nlet estado = respuesta_mqtt.error ? \"NO_AUTORIZADO\" : \"AUTORIZADO\";\n\nconst fechaArgentina = new Date(Date.now() - (3 * 60 * 60 * 1000)).toISOString();\n\nmsg.payload = {\n    \"hash_tarjeta\": hash,\n    \"timestamp_acceso\": fechaArgentina,\n    \"estado_autorizacion\": estado\n};\n\nreturn msg;",
         "outputs": 1,
         "timeout": 0,
         "noerr": 0,
@@ -416,46 +455,242 @@
         ]
     },
     {
-        "id": "275073b039673249",
-        "type": "postgreSQLConfig",
-        "name": "Rack_Smart_DB",
-        "host": "postgres",
-        "hostFieldType": "str",
-        "port": 5432,
-        "portFieldType": "num",
-        "database": "Rack_Smart",
-        "databaseFieldType": "str",
-        "ssl": "false",
-        "sslFieldType": "bool",
-        "applicationName": "",
-        "applicationNameType": "str",
-        "max": 10,
-        "maxFieldType": "num",
-        "idle": 1000,
-        "idleFieldType": "num",
-        "connectionTimeout": 10000,
-        "connectionTimeoutFieldType": "num",
-        "userFieldType": "cred",
-        "userEnv": "",
-        "passwordFieldType": "cred",
-        "passwordEnv": ""
+        "id": "mqtt_clima_in",
+        "type": "mqtt in",
+        "z": "b76378b697bed2cd",
+        "name": "Clima ESP32",
+        "topic": "rack/sensores/ambiente",
+        "qos": "0",
+        "datatype": "auto-detect",
+        "broker": "8db05a903fd0858d",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 110,
+        "y": 920,
+        "wires": [
+            [
+                "func_guardar_clima"
+            ]
+        ]
     },
     {
-        "id": "8db05a903fd0858d",
-        "type": "mqtt-broker",
-        "name": "mosquitto",
-        "broker": "mosquitto",
-        "port": 1883,
-        "clientid": "",
-        "autoConnect": true,
-        "usetls": false,
-        "protocolVersion": "4",
-        "keepalive": 60,
-        "cleansession": true,
-        "autoUnsubscribe": true
+        "id": "func_guardar_clima",
+        "type": "function",
+        "z": "b76378b697bed2cd",
+        "name": "Guardar Clima",
+        "func": "let datos = msg.payload;\nif (typeof datos === \"string\") {\n    try {\n        datos = JSON.parse(datos);\n    } catch (e) {\n        return null;\n    }\n}\n\nconst temp = Number(datos.temperatura);\nconst hum = Number(datos.humedad);\n\nif (!isNaN(temp) && !isNaN(hum)) {\n    const fechaArgentina = new Date(Date.now() - (3 * 60 * 60 * 1000)).toISOString();\n\n    global.set(\"ultimo_clima\", {\n        temperatura: temp,\n        humedad: hum,\n        cooler_activo: temp > 30.0,\n        timestamp: fechaArgentina\n    });\n}\nreturn null;",
+        "outputs": 0,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 340,
+        "y": 920,
+        "wires": []
     },
     {
-        "id": "d20c4cd2f8e8f4b5",
+        "id": "http_get_clima",
+        "type": "http in",
+        "z": "b76378b697bed2cd",
+        "name": "get clima",
+        "url": "/api/clima",
+        "method": "get",
+        "upload": false,
+        "skipBodyParsing": false,
+        "x": 100,
+        "y": 980,
+        "wires": [
+            [
+                "func_get_clima"
+            ]
+        ]
+    },
+    {
+        "id": "func_get_clima",
+        "type": "function",
+        "z": "b76378b697bed2cd",
+        "name": "Leer Clima",
+        "func": "msg.payload = global.get(\"ultimo_clima\") || {\n    temperatura: 0.0,\n    humedad: 0.0,\n    cooler_activo: false,\n    timestamp: null\n};\nreturn msg;",
+        "outputs": 1,
+        "x": 330,
+        "y": 980,
+        "wires": [
+            [
+                "http_resp_app"
+            ]
+        ]
+    },
+    {
+        "id": "http_get_tarjetas",
+        "type": "http in",
+        "z": "b76378b697bed2cd",
+        "name": "get tarjetas",
+        "url": "/api/tarjetas",
+        "method": "get",
+        "upload": false,
+        "skipBodyParsing": false,
+        "x": 100,
+        "y": 1060,
+        "wires": [
+            [
+                "pg_get_tarjetas"
+            ]
+        ]
+    },
+    {
+        "id": "pg_get_tarjetas",
+        "type": "postgresql",
+        "z": "b76378b697bed2cd",
+        "name": "BD Tarjetas",
+        "query": "SELECT t.id_tarjeta, t.hash_tarjeta, u.id_usuario, u.nombre_usuario, u.estado FROM tarjetas_rfid t JOIN usuarios u ON u.id_usuario = t.id_usuario ORDER BY u.nombre_usuario ASC;",
+        "postgreSQLConfig": "275073b039673249",
+        "split": false,
+        "rowsPerMsg": 1,
+        "outputs": 1,
+        "x": 330,
+        "y": 1060,
+        "wires": [
+            [
+                "http_resp_app"
+            ]
+        ]
+    },
+    {
+        "id": "http_post_tarjetas",
+        "type": "http in",
+        "z": "b76378b697bed2cd",
+        "name": "post tarjetas",
+        "url": "/api/tarjetas",
+        "method": "post",
+        "upload": false,
+        "skipBodyParsing": false,
+        "x": 110,
+        "y": 1140,
+        "wires": [
+            [
+                "func_post_tarjetas"
+            ]
+        ]
+    },
+    {
+        "id": "func_post_tarjetas",
+        "type": "function",
+        "z": "b76378b697bed2cd",
+        "name": "Alta Usuario y RFID",
+        "func": "const nombre = (msg.payload.nombre_usuario || \"\").trim();\nconst hash = (msg.payload.hash_tarjeta || \"\").trim().toLowerCase();\n\nif (!nombre || !hash) {\n    msg.statusCode = 400;\n    msg.payload = { error: \"Faltan datos obligatorios\" };\n    return [null, msg];\n}\n\nmsg.query = `\n    WITH u AS (\n        INSERT INTO usuarios (nombre_usuario, estado)\n        VALUES ($1, true)\n        ON CONFLICT (nombre_usuario) DO UPDATE SET estado = true\n        RETURNING id_usuario\n    )\n    INSERT INTO tarjetas_rfid (id_usuario, hash_tarjeta)\n    VALUES ((SELECT id_usuario FROM u), $2)\n    ON CONFLICT (hash_tarjeta) DO UPDATE SET id_usuario = (SELECT id_usuario FROM u)\n    RETURNING id_tarjeta, hash_tarjeta;\n`;\nmsg.params = [nombre, hash];\nreturn [msg, null];",
+        "outputs": 2,
+        "x": 350,
+        "y": 1140,
+        "wires": [
+            [
+                "pg_exec_app"
+            ],
+            [
+                "http_resp_app"
+            ]
+        ]
+    },
+    {
+        "id": "http_put_estado",
+        "type": "http in",
+        "z": "b76378b697bed2cd",
+        "name": "put estado",
+        "url": "/api/usuarios/estado",
+        "method": "put",
+        "upload": false,
+        "skipBodyParsing": false,
+        "x": 100,
+        "y": 1220,
+        "wires": [
+            [
+                "func_put_estado"
+            ]
+        ]
+    },
+    {
+        "id": "func_put_estado",
+        "type": "function",
+        "z": "b76378b697bed2cd",
+        "name": "Cambiar Estado",
+        "func": "const id_usuario = Number(msg.payload.id_usuario);\nconst estado = Boolean(msg.payload.estado);\n\nmsg.query = `\n    UPDATE usuarios\n    SET estado = $2\n    WHERE id_usuario = $1\n    RETURNING id_usuario, nombre_usuario, estado;\n`;\nmsg.params = [id_usuario, estado];\nreturn msg;",
+        "outputs": 1,
+        "x": 340,
+        "y": 1220,
+        "wires": [
+            [
+                "pg_exec_app"
+            ]
+        ]
+    },
+    {
+        "id": "pg_exec_app",
+        "type": "postgresql",
+        "z": "b76378b697bed2cd",
+        "name": "BD Exec",
+        "query": "",
+        "postgreSQLConfig": "275073b039673249",
+        "split": false,
+        "rowsPerMsg": 1,
+        "outputs": 1,
+        "x": 580,
+        "y": 1180,
+        "wires": [
+            [
+                "http_resp_app"
+            ]
+        ]
+    },
+    {
+        "id": "http_post_remoto",
+        "type": "http in",
+        "z": "b76378b697bed2cd",
+        "name": "post remoto",
+        "url": "/api/remoto/autorizar",
+        "method": "post",
+        "upload": false,
+        "skipBodyParsing": false,
+        "x": 110,
+        "y": 1300,
+        "wires": [
+            [
+                "func_remoto"
+            ]
+        ]
+    },
+    {
+        "id": "func_remoto",
+        "type": "function",
+        "z": "b76378b697bed2cd",
+        "name": "Disparar Apertura",
+        "func": "const msgMqtt = {\n    topic: \"acceso/tarjeta/respuesta\",\n    payload: JSON.stringify({ nombre_usuario: \"App Android\" })\n};\n\nmsg.statusCode = 200;\nmsg.payload = { ok: true, mensaje: \"Comando enviado al rack\" };\nreturn [msgMqtt, msg];",
+        "outputs": 2,
+        "x": 350,
+        "y": 1300,
+        "wires": [
+            [
+                "968ea4e7339dc67e"
+            ],
+            [
+                "http_resp_app"
+            ]
+        ]
+    },
+    {
+        "id": "http_resp_app",
+        "type": "http response",
+        "z": "b76378b697bed2cd",
+        "name": "Resp App",
+        "statusCode": "",
+        "headers": {},
+        "x": 820,
+        "y": 1120,
+        "wires": []
+    },
+    {
+        "id": "ddfe56abb6b1239b",
         "type": "global-config",
         "env": [],
         "modules": {
