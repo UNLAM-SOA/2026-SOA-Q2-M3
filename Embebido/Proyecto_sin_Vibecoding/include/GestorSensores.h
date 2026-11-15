@@ -10,9 +10,22 @@
 MFRC522 rfid(PIN_RFID_SS, PIN_RFID_RST);
 DHTesp  dht;
 
+inline void reiniciarLectorRFID() {
+  pinMode(PIN_RFID_RST, OUTPUT);
+  digitalWrite(PIN_RFID_RST, LOW);
+  vTaskDelay(pdMS_TO_TICKS(PAUSA_RESET_FISICO_RFID_MS));
+  digitalWrite(PIN_RFID_RST, HIGH);
+  vTaskDelay(pdMS_TO_TICKS(PAUSA_RESET_FISICO_RFID_MS));
+
+  rfid.PCD_Init();
+  rfid.PCD_AntennaOn();
+  rfid.PCD_SetAntennaGain(GANANCIA_MAXIMA_RFID);
+}
+
 inline void sensoresInicializarHardware() {
   SPI.begin();
-  rfid.PCD_Init();
+  SPI.setFrequency(FRECUENCIA_SPI_RFID_HZ);
+  reiniciarLectorRFID();
   vTaskDelay(pdMS_TO_TICKS(PAUSA_INIT_RFID_MS));
 
   byte versionRFID = rfid.PCD_ReadRegister(MFRC522::VersionReg);
@@ -23,24 +36,41 @@ inline void sensoresInicializarHardware() {
     Serial.println("[RFID] RC522 detectado correctamente.");
   }
 
-  dht.setup(PIN_DHT, DHTesp::DHT11);
+  dht.setup(PIN_DHT, MODELO_SENSOR_DHT);
   Serial.println("[DHT11] Sensor inicializado en GPIO " + String(PIN_DHT));
 }
 
 inline String extraerHashTarjetaRFID() {
   String hashTarjeta = "";
-  for (byte i = 0; i < rfid.uid.size; i++) {
+  for (byte i = INDICE_INICIAL_CERO; i < rfid.uid.size; i++) {
     if (rfid.uid.uidByte[i] < BYTE_HEX_LIMITE_CERO) {
-      hashTarjeta += "0";
+      hashTarjeta += PREFIJO_HEX_CERO;
     }
     hashTarjeta += String(rfid.uid.uidByte[i], HEX);
   }
   return hashTarjeta;
 }
 
+inline void verificarSaludRFID() {
+  byte versionRFID  = rfid.PCD_ReadRegister(MFRC522::VersionReg);
+  byte estadoAntena = rfid.PCD_ReadRegister(MFRC522::TxControlReg);
+
+  if (versionRFID == REGISTRO_RFID_VACIO_00 || versionRFID == REGISTRO_RFID_VACIO_FF || ((estadoAntena & MASCARA_ANTENA_RFID) != MASCARA_ANTENA_RFID)) {
+    reiniciarLectorRFID();
+  } else {
+    rfid.PCD_AntennaOn();
+    rfid.PCD_SetAntennaGain(GANANCIA_MAXIMA_RFID);
+  }
+}
+
 inline void muestrearLectorRFID(unsigned long &ultimoEscaneo) {
+  byte estadoAntena = rfid.PCD_ReadRegister(MFRC522::TxControlReg);
+  if ((estadoAntena & MASCARA_ANTENA_RFID) != MASCARA_ANTENA_RFID) {
+    reiniciarLectorRFID();
+  }
+
   if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {
-    if (ultimoEscaneo == 0 || millis() - ultimoEscaneo > TIEMPO_ANTIRREBOTE_RFID_MS) {
+    if (ultimoEscaneo == TIEMPO_INICIAL_CERO || millis() - ultimoEscaneo > TIEMPO_ANTIRREBOTE_RFID_MS) {
       String hashTarjeta = extraerHashTarjetaRFID();
 
       Serial.println("\n[RFID] Tarjeta detectada en lector fisico: " + hashTarjeta);
@@ -71,11 +101,18 @@ inline void muestrearSensorPuerta(int &estadoPuertaAnterior) {
 
 inline void tareaGetEvent(void *parameter) {
   int estadoPuertaAnterior = ESTADO_PUERTA_INDEFINIDO;
-  unsigned long ultimoEscaneoRFID = 0;
+  unsigned long ultimoEscaneoRFID = TIEMPO_INICIAL_CERO;
+  unsigned long ultimoChequeoSaludRFID = TIEMPO_INICIAL_CERO;
 
   while (true) {
     muestrearSensorPuerta(estadoPuertaAnterior);
     muestrearLectorRFID(ultimoEscaneoRFID);
+
+    if (millis() - ultimoChequeoSaludRFID > TIEMPO_ANTIRREBOTE_RFID_MS) {
+      verificarSaludRFID();
+      ultimoChequeoSaludRFID = millis();
+    }
+
     vTaskDelay(pdMS_TO_TICKS(CADENCIA_SENSORES_MS));
   }
 }
@@ -101,4 +138,4 @@ inline void tareaMonitoreoClimatico(void *parameter) {
   }
 }
 
-#endif // GESTOR_SENSORES_H
+#endif
