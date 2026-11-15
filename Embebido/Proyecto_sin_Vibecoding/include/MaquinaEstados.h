@@ -5,7 +5,7 @@
 
 int estadoActual = ESTADO_EMBEDDED_INIT;
 
-// -- Callbacks de Temporizadores de Software --
+//Callbacks de Temporizadores de Software
 inline void callbackTimerAcceso(TimerHandle_t xTimer) {
   enviarEvento(TIPO_EVENTO_TIMEOUT_ACCESO);
 }
@@ -18,7 +18,7 @@ inline void callbackTimerMensajeLCD(TimerHandle_t xTimer) {
   enviarEvento(TIPO_EVENTO_FIN_MENSAJE_LCD);
 }
 
-// -- Funciones Encapsuladas de Actualización de Actuadores para la FSM --
+//Funciones Encapsuladas de Actualización de Actuadores para la FSM
 inline void iniciarTemporizadorMensajeTemporal() {
   xTimerStop(timerMensajeLCD, TIEMPO_NO_BLOQUEANTE);
   xTimerStart(timerMensajeLCD, TIEMPO_NO_BLOQUEANTE);
@@ -29,8 +29,8 @@ inline void accionarModoReposo() {
   xTimerStop(timerSirena, TIEMPO_NO_BLOQUEANTE);
   xTimerStop(timerMensajeLCD, TIEMPO_NO_BLOQUEANTE);
   encolarAccion(ACCION_BUZZER_SILENCIAR);
-  encolarAccion(ACCION_LED_APAGAR);
   encolarAccion(ACCION_LCD_ESTADO_REPOSO);
+  encolarAccion(ACCION_LED_APAGAR);
 }
 
 inline void accionarVentanaAccesoConcedido() {
@@ -38,6 +38,7 @@ inline void accionarVentanaAccesoConcedido() {
   xTimerStop(timerAcceso, TIEMPO_NO_BLOQUEANTE);
   xTimerStart(timerAcceso, TIEMPO_NO_BLOQUEANTE);
   encolarAccion(ACCION_LCD_ESTADO_ACCESO);
+  encolarAccion(ACCION_LED_APAGAR);
 }
 
 inline void accionarModoPuertaAbierta() {
@@ -45,15 +46,15 @@ inline void accionarModoPuertaAbierta() {
   xTimerStop(timerSirena, TIEMPO_NO_BLOQUEANTE);
   xTimerStop(timerMensajeLCD, TIEMPO_NO_BLOQUEANTE);
   encolarAccion(ACCION_BUZZER_SILENCIAR);
-  encolarAccion(ACCION_LED_BLANCO);
   encolarAccion(ACCION_LCD_ESTADO_ABIERTA);
+  encolarAccion(ACCION_LED_BLANCO);
 }
 
 inline void accionarAlertaIntrusion() {
   xTimerStop(timerAcceso, TIEMPO_NO_BLOQUEANTE);
   xTimerStop(timerMensajeLCD, TIEMPO_NO_BLOQUEANTE);
-  encolarAccion(ACCION_LED_ROJO);
   encolarAccion(ACCION_LCD_ESTADO_INTRUSION);
+  encolarAccion(ACCION_LED_ROJO);
   xTimerStart(timerSirena, TIEMPO_NO_BLOQUEANTE);
 }
 
@@ -78,18 +79,22 @@ inline void accionarAvisoSinServidor() {
 
 inline void restaurarPantallaEstadoReposo() {
   encolarAccion(ACCION_LCD_ESTADO_REPOSO);
+  encolarAccion(ACCION_LED_APAGAR);
 }
 
 inline void restaurarPantallaEstadoAcceso() {
   encolarAccion(ACCION_LCD_ESTADO_ACCESO);
+  encolarAccion(ACCION_LED_APAGAR);
 }
 
 inline void restaurarPantallaEstadoPuertaAbierta() {
   encolarAccion(ACCION_LCD_ESTADO_ABIERTA);
+  encolarAccion(ACCION_LED_BLANCO);
 }
 
 inline void restaurarPantallaEstadoIntrusion() {
   encolarAccion(ACCION_LCD_ESTADO_INTRUSION);
+  encolarAccion(ACCION_LED_ROJO);
 }
 
 inline void accionarClimaTemperaturaAlta(float temperatura) {
@@ -106,7 +111,7 @@ inline void accionarClimaErrorSensor() {
   encolarAccion(ACCION_LCD_TEMP_ERROR);
 }
 
-// -- Máquina de Estados Finito (FSM) --
+//Máquina de Estados Finito (FSM)
 inline void maquina_estados(stEvento evento) {
   switch (estadoActual) {
     case ESTADO_EMBEDDED_INIT: {
@@ -117,9 +122,9 @@ inline void maquina_estados(stEvento evento) {
           estadoActual = ESTADO_EMBEDDED_REPOSO;
           break;
         case TIPO_EVENTO_PUERTA_ABIERTA:
-          Serial.println("\n[FSM]: INIT -> Puerta ABIERTA -> Transicion a PUERTA_ABIERTA");
-          accionarModoPuertaAbierta();
-          estadoActual = ESTADO_EMBEDDED_PUERTA_ABIERTA;
+          Serial.println("\n[FSM]: INIT -> Puerta ABIERTA -> Transicion a ALERTA_INTRUSION");
+          accionarAlertaIntrusion();
+          estadoActual = ESTADO_EMBEDDED_ALERTA_INTRUSION;
           break;
         case TIPO_EVENTO_TEMP_ALTA:
           accionarClimaTemperaturaAlta(evento.valor);
@@ -135,6 +140,9 @@ inline void maquina_estados(stEvento evento) {
 
     case ESTADO_EMBEDDED_REPOSO: {
       switch (evento.tipo) {
+        case TIPO_EVENTO_PUERTA_CERRADA:
+          accionarModoReposo();
+          break;
         case TIPO_EVENTO_TARJETA_LEYENDO:
           accionarAvisoValidandoTarjeta();
           break;
@@ -176,6 +184,9 @@ inline void maquina_estados(stEvento evento) {
           Serial.println("\n[FSM]: ACCESO_CONCEDIDO | [EVENTO]: PUERTA ABIERTA -> PUERTA_ABIERTA");
           accionarModoPuertaAbierta();
           estadoActual = ESTADO_EMBEDDED_PUERTA_ABIERTA;
+          break;
+        case TIPO_EVENTO_PUERTA_CERRADA:
+          encolarAccion(ACCION_LED_APAGAR);
           break;
         case TIPO_EVENTO_TIMEOUT_ACCESO:
           Serial.println("\n[FSM]: ACCESO_CONCEDIDO | [EVENTO]: TIMEOUT (5s) -> REPOSO");
@@ -219,6 +230,9 @@ inline void maquina_estados(stEvento evento) {
           break;
         case TIPO_EVENTO_TARJETA_LEYENDO:
           accionarAvisoValidandoTarjeta();
+          break;
+        case TIPO_EVENTO_TARJETA_VALIDA:
+          restaurarPantallaEstadoPuertaAbierta();
           break;
         case TIPO_EVENTO_TARJETA_DENEGADA:
           accionarAvisoTarjetaDenegada();
