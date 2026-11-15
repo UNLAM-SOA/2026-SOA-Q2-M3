@@ -92,7 +92,8 @@ docker compose up -d
 
 ```/api/accesos --> Obtener el historial completo de autorizados y denegados. Devuelve 200 OK```
 
-
+### PUT
+```/api/usuarios/estado --> Habilita o deshabilita el permiso de un usuario. Devuelve 200 OK```
 
 
 
