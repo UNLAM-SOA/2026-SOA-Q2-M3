@@ -2,7 +2,14 @@
 
 package com.example.infraguard
 
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.HandlerThread
+import android.os.SystemClock
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -19,19 +26,103 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.lifecycleScope
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-class MainActivity : ComponentActivity() {
+class MainActivity : ComponentActivity(), SensorEventListener {
+
+    private lateinit var sensorManager: SensorManager
+    private var acelerometro: Sensor? = null
+    private var sensorThread: HandlerThread? = null
+
+    private var ultimaAccion = 0L
+    private var coolerEnModoManual = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
+        acelerometro = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+
         setContent {
             MaterialTheme {
                 InfraGuardApp()
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        acelerometro?.let { sensor ->
+            val thread = HandlerThread("AcelerometroThread").apply { start() }
+            sensorThread = thread
+            val handler = Handler(thread.looper)
+
+            sensorManager.registerListener(
+                this,
+                sensor,
+                SensorManager.SENSOR_DELAY_NORMAL,
+                handler
+            )
+        }
+    }
+
+    override fun onPause() {
+        sensorManager.unregisterListener(this)
+        sensorThread?.quitSafely()
+        sensorThread = null
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        MqttManager.desconectar()
+        super.onDestroy()
+    }
+
+    override fun onSensorChanged(event: SensorEvent?) {
+        if (event == null) return
+
+        val x = event.values[0]
+        val ahora = SystemClock.elapsedRealtime()
+        if (ahora - ultimaAccion < 1500) return
+
+        val nuevoModo: String? = when {
+            abs(x) > 7.0f && !coolerEnModoManual -> "on"
+            abs(x) < 3.0f && coolerEnModoManual -> "auto"
+            else -> null
+        }
+
+        if (nuevoModo != null) {
+            ultimaAccion = ahora
+            coolerEnModoManual = (nuevoModo == "on")
+
+            lifecycleScope.launch {
+                try {
+                    // Si preferís publicar directo por Mosquitto (puerto 1883),
+                    // reemplazá esta línea por: MqttManager.publicarModoCooler(nuevoModo)
+                    RetrofitClient.api.cambiarModoCooler(CoolerRequest(nuevoModo))
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Giro detectado -> Cooler: ${nuevoModo.uppercase()}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } catch (e: Exception) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Error al enviar cooler ($nuevoModo): ${e.localizedMessage ?: e.javaClass.simpleName}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
     }
 }
 
@@ -50,8 +141,12 @@ fun InfraGuardApp() {
     var nuevoNombre by remember { mutableStateOf("") }
     var nuevoHash by remember { mutableStateOf("") }
 
+    var mostrarDialogoIp by remember { mutableStateOf(false) }
+    var ipInput by remember { mutableStateOf(RetrofitClient.ipServidor) }
+    var ipActual by remember { mutableStateOf(RetrofitClient.ipServidor) }
+
     // Consultas separadas para que un fallo en una no bloquee las demás
-    LaunchedEffect(Unit) {
+    LaunchedEffect(ipActual) {
         while (true) {
             try {
                 clima = RetrofitClient.api.obtenerClima()
@@ -72,10 +167,52 @@ fun InfraGuardApp() {
         }
     }
 
+    if (mostrarDialogoIp) {
+        AlertDialog(
+            onDismissRequest = { mostrarDialogoIp = false },
+            title = { Text("Configurar IP de Node-RED") },
+            text = {
+                OutlinedTextField(
+                    value = ipInput,
+                    onValueChange = { ipInput = it },
+                    label = { Text("IP del servidor (ej. 192.168.0.120)") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    val limpia = ipInput.trim()
+                    if (limpia.isNotEmpty()) {
+                        RetrofitClient.actualizarIp(limpia)
+                        MqttManager.actualizarIp(limpia)
+                        ipActual = limpia
+                        mostrarDialogoIp = false
+                        Toast.makeText(context, "IP actualizada a $limpia", Toast.LENGTH_SHORT).show()
+                    }
+                }) {
+                    Text("Guardar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { mostrarDialogoIp = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("InfraGuard Control Center", fontWeight = FontWeight.Bold) }
+                title = { Text("InfraGuard", fontWeight = FontWeight.Bold) },
+                actions = {
+                    TextButton(onClick = {
+                        ipInput = ipActual
+                        mostrarDialogoIp = true
+                    }) {
+                        Text("⚙️ $ipActual", fontWeight = FontWeight.SemiBold)
+                    }
+                }
             )
         }
     ) { padding ->
@@ -131,10 +268,10 @@ fun InfraGuardApp() {
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = if (clima.coolerActivo) {
-                                    "❄️ COOLER ENCENDIDO (> 30°C)"
-                                } else {
-                                    "✅ COOLER EN REPOSO (<= 30°C)"
+                                text = when {
+                                    clima.coolerManual -> "❄️ COOLER ENCENDIDO (MODO MANUAL)"
+                                    clima.coolerActivo -> "❄️ COOLER ENCENDIDO (> 30°C)"
+                                    else -> "✅ COOLER EN REPOSO (<= 30°C)"
                                 },
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -158,11 +295,11 @@ fun InfraGuardApp() {
                                         "Acceso concedido / Alarma desarmada",
                                         Toast.LENGTH_SHORT
                                     ).show()
-                                } catch (_: Exception) {
+                                } catch (e: Exception) {
                                     Toast.makeText(
                                         context,
-                                        "Error de conexión con Node-RED",
-                                        Toast.LENGTH_SHORT
+                                        "Error con Node-RED: ${e.localizedMessage ?: e.javaClass.simpleName}",
+                                        Toast.LENGTH_LONG
                                     ).show()
                                 }
                             }
