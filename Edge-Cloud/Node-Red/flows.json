@@ -92,7 +92,7 @@
         "upload": false,
         "skipBodyParsing": false,
         "swaggerDoc": "",
-        "x": 70,
+        "x": 150,
         "y": 320,
         "wires": [
             [
@@ -480,7 +480,7 @@
         "type": "function",
         "z": "b76378b697bed2cd",
         "name": "Guardar Clima",
-        "func": "let datos = msg.payload;\nif (typeof datos === \"string\") {\n    try {\n        datos = JSON.parse(datos);\n    } catch (e) {\n        return null;\n    }\n}\n\nconst temp = Number(datos.temperatura);\nconst hum = Number(datos.humedad);\n\nif (!isNaN(temp) && !isNaN(hum)) {\n    const fechaArgentina = new Date(Date.now() - (3 * 60 * 60 * 1000)).toISOString();\n\n    global.set(\"ultimo_clima\", {\n        temperatura: temp,\n        humedad: hum,\n        cooler_activo: temp > 30.0,\n        timestamp: fechaArgentina\n    });\n}\nreturn null;",
+        "func": "let datos = msg.payload;\nif (typeof datos === \"string\") {\n    try {\n        datos = JSON.parse(datos);\n    } catch (e) {\n        return null;\n    }\n}\n\nconst temp = Number(datos.temperatura);\nconst hum = Number(datos.humedad);\nconst coolerManual = global.get(\"cooler_manual\") === true;\n\nif (!isNaN(temp) && !isNaN(hum)) {\n    const fechaArgentina = new Date(Date.now() - (3 * 60 * 60 * 1000)).toISOString();\n\n    global.set(\"ultimo_clima\", {\n        temperatura: temp,\n        humedad: hum,\n        cooler_activo: coolerManual || (temp > 30.0),\n        cooler_manual: coolerManual,\n        timestamp: fechaArgentina\n    });\n}\nreturn null;",
         "outputs": 0,
         "timeout": "",
         "noerr": 0,
@@ -690,7 +690,129 @@
         "wires": []
     },
     {
-        "id": "ddfe56abb6b1239b",
+        "id": "mqtt_cooler_in",
+        "type": "mqtt in",
+        "z": "b76378b697bed2cd",
+        "name": "Cooler Manual In",
+        "topic": "control/cooler",
+        "qos": "0",
+        "datatype": "auto-detect",
+        "broker": "8db05a903fd0858d",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 100,
+        "y": 1380,
+        "wires": [
+            [
+                "func_guardar_cooler"
+            ]
+        ]
+    },
+    {
+        "id": "func_guardar_cooler",
+        "type": "function",
+        "z": "b76378b697bed2cd",
+        "name": "Estado Cooler Manual",
+        "func": "let datos = msg.payload;\nif (typeof datos === \"string\") {\n    try {\n        datos = JSON.parse(datos);\n    } catch (e) {\n        return null;\n    }\n}\n\nconst comando = String(datos?.cooler || \"\").trim().toLowerCase();\nif (comando !== \"on\" && comando !== \"auto\") {\n    return null;\n}\n\nconst esManual = (comando === \"on\");\nglobal.set(\"cooler_manual\", esManual);\n\nconst climaActual = global.get(\"ultimo_clima\") || {\n    temperatura: 0.0,\n    humedad: 0.0,\n    cooler_activo: false,\n    timestamp: null\n};\n\nclimaActual.cooler_manual = esManual;\nclimaActual.cooler_activo = esManual || (Number(climaActual.temperatura) > 30.0);\nglobal.set(\"ultimo_clima\", climaActual);\n\nmsg.payload = {\n    comando_recibido: comando,\n    cooler_manual: esManual,\n    cooler_activo: climaActual.cooler_activo\n};\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 340,
+        "y": 1380,
+        "wires": [
+            [
+                "debug_cooler"
+            ]
+        ]
+    },
+    {
+        "id": "debug_cooler",
+        "type": "debug",
+        "z": "b76378b697bed2cd",
+        "name": "Debug Cooler",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 580,
+        "y": 1380,
+        "wires": []
+    },
+    {
+        "id": "http_post_cooler",
+        "type": "http in",
+        "z": "b76378b697bed2cd",
+        "name": "post cooler",
+        "url": "/api/remoto/cooler",
+        "method": "post",
+        "upload": false,
+        "skipBodyParsing": false,
+        "x": 90,
+        "y": 1460,
+        "wires": [
+            [
+                "func_remoto_cooler"
+            ]
+        ]
+    },
+    {
+        "id": "func_remoto_cooler",
+        "type": "function",
+        "z": "b76378b697bed2cd",
+        "name": "Control Cooler HTTP",
+        "func": "const comando = String(msg.payload?.cooler || \"\").trim().toLowerCase();\n\nif (comando !== \"on\" && comando !== \"auto\") {\n    msg.statusCode = 400;\n    msg.payload = { error: \"El campo 'cooler' debe ser 'on' o 'auto'.\" };\n    return [null, msg];\n}\n\nconst msgMqtt = {\n    topic: \"control/cooler\",\n    payload: JSON.stringify({ cooler: comando })\n};\n\nmsg.statusCode = 200;\nmsg.payload = { ok: true, cooler: comando };\nreturn [msgMqtt, msg];",
+        "outputs": 2,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 340,
+        "y": 1460,
+        "wires": [
+            [
+                "mqtt_cooler_out"
+            ],
+            [
+                "http_resp_cooler"
+            ]
+        ]
+    },
+    {
+        "id": "mqtt_cooler_out",
+        "type": "mqtt out",
+        "z": "b76378b697bed2cd",
+        "name": "mqtt cooler",
+        "topic": "control/cooler",
+        "qos": "0",
+        "retain": "",
+        "broker": "8db05a903fd0858d",
+        "x": 580,
+        "y": 1440,
+        "wires": []
+    },
+    {
+        "id": "http_resp_cooler",
+        "type": "http response",
+        "z": "b76378b697bed2cd",
+        "name": "Resp Cooler",
+        "statusCode": "",
+        "headers": {},
+        "x": 580,
+        "y": 1500,
+        "wires": []
+    },
+    {
+        "id": "8132acfcff150967",
         "type": "global-config",
         "env": [],
         "modules": {
