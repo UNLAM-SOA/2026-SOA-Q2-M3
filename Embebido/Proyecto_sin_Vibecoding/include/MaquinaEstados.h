@@ -5,26 +5,31 @@
 
 int estadoActual = ESTADO_EMBEDDED_INIT;
 
-//Callbacks de Temporizadores de Software
-inline void callbackTimerAcceso(TimerHandle_t xTimer) {
+// Callbacks de Temporizadores de Software
+inline void callbackTimerAcceso(TimerHandle_t xTimer)
+{
   enviarEvento(TIPO_EVENTO_TIMEOUT_ACCESO);
 }
 
-inline void callbackTimerSirena(TimerHandle_t xTimer) {
+inline void callbackTimerSirena(TimerHandle_t xTimer)
+{
   enviarEvento(TIPO_EVENTO_TICK_SIRENA);
 }
 
-inline void callbackTimerMensajeLCD(TimerHandle_t xTimer) {
+inline void callbackTimerMensajeLCD(TimerHandle_t xTimer)
+{
   enviarEvento(TIPO_EVENTO_FIN_MENSAJE_LCD);
 }
 
-//Funciones Encapsuladas de Actualización de Actuadores para la FSM
-inline void iniciarTemporizadorMensajeTemporal() {
+// Funciones Encapsuladas de Actualización de Actuadores para la FSM
+inline void iniciarTemporizadorMensajeTemporal()
+{
   xTimerStop(timerMensajeLCD, TIEMPO_NO_BLOQUEANTE);
   xTimerStart(timerMensajeLCD, TIEMPO_NO_BLOQUEANTE);
 }
 
-inline void accionarModoReposo() {
+inline void accionarModoReposo()
+{
   xTimerStop(timerAcceso, TIEMPO_NO_BLOQUEANTE);
   xTimerStop(timerSirena, TIEMPO_NO_BLOQUEANTE);
   xTimerStop(timerMensajeLCD, TIEMPO_NO_BLOQUEANTE);
@@ -33,7 +38,8 @@ inline void accionarModoReposo() {
   encolarAccion(ACCION_LED_APAGAR);
 }
 
-inline void accionarVentanaAccesoConcedido() {
+inline void accionarVentanaAccesoConcedido()
+{
   xTimerStop(timerMensajeLCD, TIEMPO_NO_BLOQUEANTE);
   xTimerStop(timerAcceso, TIEMPO_NO_BLOQUEANTE);
   xTimerStart(timerAcceso, TIEMPO_NO_BLOQUEANTE);
@@ -41,7 +47,8 @@ inline void accionarVentanaAccesoConcedido() {
   encolarAccion(ACCION_LED_APAGAR);
 }
 
-inline void accionarModoPuertaAbierta() {
+inline void accionarModoPuertaAbierta()
+{
   xTimerStop(timerAcceso, TIEMPO_NO_BLOQUEANTE);
   xTimerStop(timerSirena, TIEMPO_NO_BLOQUEANTE);
   xTimerStop(timerMensajeLCD, TIEMPO_NO_BLOQUEANTE);
@@ -50,7 +57,8 @@ inline void accionarModoPuertaAbierta() {
   encolarAccion(ACCION_LED_BLANCO);
 }
 
-inline void accionarAlertaIntrusion() {
+inline void accionarAlertaIntrusion()
+{
   xTimerStop(timerAcceso, TIEMPO_NO_BLOQUEANTE);
   xTimerStop(timerMensajeLCD, TIEMPO_NO_BLOQUEANTE);
   encolarAccion(ACCION_LCD_ESTADO_INTRUSION);
@@ -58,248 +66,297 @@ inline void accionarAlertaIntrusion() {
   xTimerStart(timerSirena, TIEMPO_NO_BLOQUEANTE);
 }
 
-inline void accionarPulsoSirena() {
+inline void accionarPulsoSirena()
+{
   encolarAccion(ACCION_SIRENA_PWM_TOGGLE);
 }
 
-inline void accionarAvisoValidandoTarjeta() {
+inline void accionarAvisoValidandoTarjeta()
+{
   encolarAccion(ACCION_LCD_VALIDANDO);
   iniciarTemporizadorMensajeTemporal();
 }
 
-inline void accionarAvisoTarjetaDenegada() {
+inline void accionarAvisoTarjetaDenegada()
+{
   encolarAccion(ACCION_LCD_DENEGADO);
   iniciarTemporizadorMensajeTemporal();
 }
 
-inline void accionarAvisoSinServidor() {
+inline void accionarAvisoSinServidor()
+{
   encolarAccion(ACCION_LCD_SIN_SERVIDOR);
   iniciarTemporizadorMensajeTemporal();
 }
 
-inline void restaurarPantallaEstadoReposo() {
+inline void restaurarPantallaEstadoReposo()
+{
   encolarAccion(ACCION_LCD_ESTADO_REPOSO);
   encolarAccion(ACCION_LED_APAGAR);
 }
 
-inline void restaurarPantallaEstadoAcceso() {
+inline void restaurarPantallaEstadoAcceso()
+{
   encolarAccion(ACCION_LCD_ESTADO_ACCESO);
   encolarAccion(ACCION_LED_APAGAR);
 }
 
-inline void restaurarPantallaEstadoPuertaAbierta() {
+inline void restaurarPantallaEstadoPuertaAbierta()
+{
   encolarAccion(ACCION_LCD_ESTADO_ABIERTA);
   encolarAccion(ACCION_LED_BLANCO);
 }
 
-inline void restaurarPantallaEstadoIntrusion() {
+inline void restaurarPantallaEstadoIntrusion()
+{
   encolarAccion(ACCION_LCD_ESTADO_INTRUSION);
   encolarAccion(ACCION_LED_ROJO);
 }
 
-inline void accionarClimaTemperaturaAlta(float temperatura) {
+inline void accionarClimaTemperaturaAlta(float temperatura)
+{
   encolarAccion(ACCION_LCD_TEMP_ACTUALIZAR, temperatura);
   encolarAccion(ACCION_RELE_COOLER_ON);
 }
-
-inline void accionarClimaTemperaturaNormal(float temperatura) {
+inline void accionarCoolerManual()
+{
+  encolarAccion(ACCION_RELE_COOLER_ON);
+}
+inline void accionarClimaTemperaturaNormal(float temperatura)
+{
   encolarAccion(ACCION_LCD_TEMP_ACTUALIZAR, temperatura);
   encolarAccion(ACCION_RELE_COOLER_OFF);
 }
 
-inline void accionarClimaErrorSensor() {
+inline void accionarClimaErrorSensor()
+{
   encolarAccion(ACCION_LCD_TEMP_ERROR);
 }
 
-//Máquina de Estados Finito (FSM)
-inline void maquina_estados(stEvento evento) {
-  switch (estadoActual) {
-    case ESTADO_EMBEDDED_INIT: {
-      switch (evento.tipo) {
-        case TIPO_EVENTO_PUERTA_CERRADA:
-          Serial.println("\n[FSM]: INIT -> Puerta CERRADA -> Transicion a REPOSO");
-          accionarModoReposo();
-          estadoActual = ESTADO_EMBEDDED_REPOSO;
-          break;
-        case TIPO_EVENTO_PUERTA_ABIERTA:
-          Serial.println("\n[FSM]: INIT -> Puerta ABIERTA -> Transicion a ALERTA_INTRUSION");
-          accionarAlertaIntrusion();
-          estadoActual = ESTADO_EMBEDDED_ALERTA_INTRUSION;
-          break;
-        case TIPO_EVENTO_TEMP_ALTA:
-          accionarClimaTemperaturaAlta(evento.valor);
-          break;
-        case TIPO_EVENTO_TEMP_NORMAL:
-          accionarClimaTemperaturaNormal(evento.valor);
-          break;
-        case TIPO_EVENTO_TEMP_ERROR:
-          accionarClimaErrorSensor();
-          break;
-      }
-    } break;
+// Máquina de Estados Finito (FSM)
+inline void maquina_estados(stEvento evento)
+{
+  switch (estadoActual)
+  {
+  case ESTADO_EMBEDDED_INIT:
+  {
+    switch (evento.tipo)
+    {
+    case TIPO_EVENTO_PUERTA_CERRADA:
+      Serial.println("\n[FSM]: INIT -> Puerta CERRADA -> Transicion a REPOSO");
+      accionarModoReposo();
+      estadoActual = ESTADO_EMBEDDED_REPOSO;
+      break;
+    case TIPO_EVENTO_PUERTA_ABIERTA:
+      Serial.println("\n[FSM]: INIT -> Puerta ABIERTA -> Transicion a ALERTA_INTRUSION");
+      accionarAlertaIntrusion();
+      estadoActual = ESTADO_EMBEDDED_ALERTA_INTRUSION;
+      break;
+    case TIPO_EVENTO_TEMP_ALTA:
+      accionarClimaTemperaturaAlta(evento.valor);
+      break;
+    case TIPO_EVENTO_COOLER_MANUAL:
+      accionarCoolerManual();
+      break;
+    case TIPO_EVENTO_TEMP_NORMAL:
+      accionarClimaTemperaturaNormal(evento.valor);
+      break;
+    case TIPO_EVENTO_TEMP_ERROR:
+      accionarClimaErrorSensor();
+      break;
+    }
+  }
+  break;
 
-    case ESTADO_EMBEDDED_REPOSO: {
-      switch (evento.tipo) {
-        case TIPO_EVENTO_PUERTA_CERRADA:
-          accionarModoReposo();
-          break;
-        case TIPO_EVENTO_TARJETA_LEYENDO:
-          accionarAvisoValidandoTarjeta();
-          break;
-        case TIPO_EVENTO_TARJETA_VALIDA:
-          Serial.println("[FSM]: REPOSO | [EVENTO]: TARJETA VALIDA -> ACCESO_CONCEDIDO");
-          accionarVentanaAccesoConcedido();
-          estadoActual = ESTADO_EMBEDDED_ACCESO_CONCEDIDO;
-          break;
-        case TIPO_EVENTO_TARJETA_DENEGADA:
-          Serial.println("[FSM]: REPOSO | [EVENTO]: TARJETA DENEGADA");
-          accionarAvisoTarjetaDenegada();
-          break;
-        case TIPO_EVENTO_SIN_SERVIDOR:
-          accionarAvisoSinServidor();
-          break;
-        case TIPO_EVENTO_FIN_MENSAJE_LCD:
-          restaurarPantallaEstadoReposo();
-          break;
-        case TIPO_EVENTO_PUERTA_ABIERTA:
-          Serial.println("\n[FSM]: REPOSO | [EVENTO]: PUERTA ABIERTA SIN PERMISO -> ALERTA_INTRUSION");
-          accionarAlertaIntrusion();
-          estadoActual = ESTADO_EMBEDDED_ALERTA_INTRUSION;
-          break;
-        case TIPO_EVENTO_TEMP_ALTA:
-          accionarClimaTemperaturaAlta(evento.valor);
-          break;
-        case TIPO_EVENTO_TEMP_NORMAL:
-          accionarClimaTemperaturaNormal(evento.valor);
-          break;
-        case TIPO_EVENTO_TEMP_ERROR:
-          accionarClimaErrorSensor();
-          break;
-      }
-    } break;
+  case ESTADO_EMBEDDED_REPOSO:
+  {
+    switch (evento.tipo)
+    {
+    case TIPO_EVENTO_PUERTA_CERRADA:
+      accionarModoReposo();
+      break;
+    case TIPO_EVENTO_TARJETA_LEYENDO:
+      accionarAvisoValidandoTarjeta();
+      break;
+    case TIPO_EVENTO_TARJETA_VALIDA:
+      Serial.println("[FSM]: REPOSO | [EVENTO]: TARJETA VALIDA -> ACCESO_CONCEDIDO");
+      accionarVentanaAccesoConcedido();
+      estadoActual = ESTADO_EMBEDDED_ACCESO_CONCEDIDO;
+      break;
+    case TIPO_EVENTO_TARJETA_DENEGADA:
+      Serial.println("[FSM]: REPOSO | [EVENTO]: TARJETA DENEGADA");
+      accionarAvisoTarjetaDenegada();
+      break;
+    case TIPO_EVENTO_SIN_SERVIDOR:
+      accionarAvisoSinServidor();
+      break;
+    case TIPO_EVENTO_FIN_MENSAJE_LCD:
+      restaurarPantallaEstadoReposo();
+      break;
+    case TIPO_EVENTO_PUERTA_ABIERTA:
+      Serial.println("\n[FSM]: REPOSO | [EVENTO]: PUERTA ABIERTA SIN PERMISO -> ALERTA_INTRUSION");
+      accionarAlertaIntrusion();
+      estadoActual = ESTADO_EMBEDDED_ALERTA_INTRUSION;
+      break;
+    case TIPO_EVENTO_TEMP_ALTA:
+      accionarClimaTemperaturaAlta(evento.valor);
+      break;
+    case TIPO_EVENTO_COOLER_MANUAL:
+      accionarCoolerManual();
+      break;
+    case TIPO_EVENTO_TEMP_NORMAL:
+      accionarClimaTemperaturaNormal(evento.valor);
+      break;
+    case TIPO_EVENTO_TEMP_ERROR:
+      accionarClimaErrorSensor();
+      break;
+    }
+  }
+  break;
 
-    case ESTADO_EMBEDDED_ACCESO_CONCEDIDO: {
-      switch (evento.tipo) {
-        case TIPO_EVENTO_PUERTA_ABIERTA:
-          Serial.println("\n[FSM]: ACCESO_CONCEDIDO | [EVENTO]: PUERTA ABIERTA -> PUERTA_ABIERTA");
-          accionarModoPuertaAbierta();
-          estadoActual = ESTADO_EMBEDDED_PUERTA_ABIERTA;
-          break;
-        case TIPO_EVENTO_PUERTA_CERRADA:
-          encolarAccion(ACCION_LED_APAGAR);
-          break;
-        case TIPO_EVENTO_TIMEOUT_ACCESO:
-          Serial.println("\n[FSM]: ACCESO_CONCEDIDO | [EVENTO]: TIMEOUT (5s) -> REPOSO");
-          accionarModoReposo();
-          estadoActual = ESTADO_EMBEDDED_REPOSO;
-          break;
-        case TIPO_EVENTO_TARJETA_LEYENDO:
-          accionarAvisoValidandoTarjeta();
-          break;
-        case TIPO_EVENTO_TARJETA_VALIDA:
-          Serial.println("[FSM]: ACCESO_CONCEDIDO | [EVENTO]: Reiniciando ventana de 5s");
-          accionarVentanaAccesoConcedido();
-          break;
-        case TIPO_EVENTO_TARJETA_DENEGADA:
-          accionarAvisoTarjetaDenegada();
-          break;
-        case TIPO_EVENTO_SIN_SERVIDOR:
-          accionarAvisoSinServidor();
-          break;
-        case TIPO_EVENTO_FIN_MENSAJE_LCD:
-          restaurarPantallaEstadoAcceso();
-          break;
-        case TIPO_EVENTO_TEMP_ALTA:
-          accionarClimaTemperaturaAlta(evento.valor);
-          break;
-        case TIPO_EVENTO_TEMP_NORMAL:
-          accionarClimaTemperaturaNormal(evento.valor);
-          break;
-        case TIPO_EVENTO_TEMP_ERROR:
-          accionarClimaErrorSensor();
-          break;
-      }
-    } break;
+  case ESTADO_EMBEDDED_ACCESO_CONCEDIDO:
+  {
+    switch (evento.tipo)
+    {
+    case TIPO_EVENTO_PUERTA_ABIERTA:
+      Serial.println("\n[FSM]: ACCESO_CONCEDIDO | [EVENTO]: PUERTA ABIERTA -> PUERTA_ABIERTA");
+      accionarModoPuertaAbierta();
+      estadoActual = ESTADO_EMBEDDED_PUERTA_ABIERTA;
+      break;
+    case TIPO_EVENTO_PUERTA_CERRADA:
+      encolarAccion(ACCION_LED_APAGAR);
+      break;
+    case TIPO_EVENTO_TIMEOUT_ACCESO:
+      Serial.println("\n[FSM]: ACCESO_CONCEDIDO | [EVENTO]: TIMEOUT (5s) -> REPOSO");
+      accionarModoReposo();
+      estadoActual = ESTADO_EMBEDDED_REPOSO;
+      break;
+    case TIPO_EVENTO_TARJETA_LEYENDO:
+      accionarAvisoValidandoTarjeta();
+      break;
+    case TIPO_EVENTO_TARJETA_VALIDA:
+      Serial.println("[FSM]: ACCESO_CONCEDIDO | [EVENTO]: Reiniciando ventana de 5s");
+      accionarVentanaAccesoConcedido();
+      break;
+    case TIPO_EVENTO_TARJETA_DENEGADA:
+      accionarAvisoTarjetaDenegada();
+      break;
+    case TIPO_EVENTO_SIN_SERVIDOR:
+      accionarAvisoSinServidor();
+      break;
+    case TIPO_EVENTO_FIN_MENSAJE_LCD:
+      restaurarPantallaEstadoAcceso();
+      break;
+    case TIPO_EVENTO_TEMP_ALTA:
+      accionarClimaTemperaturaAlta(evento.valor);
+      break;
+    case TIPO_EVENTO_COOLER_MANUAL:
+      accionarCoolerManual();
+      break;
+    case TIPO_EVENTO_TEMP_NORMAL:
+      accionarClimaTemperaturaNormal(evento.valor);
+      break;
+    case TIPO_EVENTO_TEMP_ERROR:
+      accionarClimaErrorSensor();
+      break;
+    }
+  }
+  break;
 
-    case ESTADO_EMBEDDED_PUERTA_ABIERTA: {
-      switch (evento.tipo) {
-        case TIPO_EVENTO_PUERTA_CERRADA:
-          Serial.println("\n[FSM]: PUERTA_ABIERTA | [EVENTO]: PUERTA CERRADA -> REPOSO");
-          accionarModoReposo();
-          estadoActual = ESTADO_EMBEDDED_REPOSO;
-          break;
-        case TIPO_EVENTO_TARJETA_LEYENDO:
-          accionarAvisoValidandoTarjeta();
-          break;
-        case TIPO_EVENTO_TARJETA_VALIDA:
-          restaurarPantallaEstadoPuertaAbierta();
-          break;
-        case TIPO_EVENTO_TARJETA_DENEGADA:
-          accionarAvisoTarjetaDenegada();
-          break;
-        case TIPO_EVENTO_SIN_SERVIDOR:
-          accionarAvisoSinServidor();
-          break;
-        case TIPO_EVENTO_FIN_MENSAJE_LCD:
-          restaurarPantallaEstadoPuertaAbierta();
-          break;
-        case TIPO_EVENTO_TEMP_ALTA:
-          accionarClimaTemperaturaAlta(evento.valor);
-          break;
-        case TIPO_EVENTO_TEMP_NORMAL:
-          accionarClimaTemperaturaNormal(evento.valor);
-          break;
-        case TIPO_EVENTO_TEMP_ERROR:
-          accionarClimaErrorSensor();
-          break;
-      }
-    } break;
+  case ESTADO_EMBEDDED_PUERTA_ABIERTA:
+  {
+    switch (evento.tipo)
+    {
+    case TIPO_EVENTO_PUERTA_CERRADA:
+      Serial.println("\n[FSM]: PUERTA_ABIERTA | [EVENTO]: PUERTA CERRADA -> REPOSO");
+      accionarModoReposo();
+      estadoActual = ESTADO_EMBEDDED_REPOSO;
+      break;
+    case TIPO_EVENTO_TARJETA_LEYENDO:
+      accionarAvisoValidandoTarjeta();
+      break;
+    case TIPO_EVENTO_TARJETA_VALIDA:
+      restaurarPantallaEstadoPuertaAbierta();
+      break;
+    case TIPO_EVENTO_TARJETA_DENEGADA:
+      accionarAvisoTarjetaDenegada();
+      break;
+    case TIPO_EVENTO_SIN_SERVIDOR:
+      accionarAvisoSinServidor();
+      break;
+    case TIPO_EVENTO_FIN_MENSAJE_LCD:
+      restaurarPantallaEstadoPuertaAbierta();
+      break;
+    case TIPO_EVENTO_TEMP_ALTA:
+      accionarClimaTemperaturaAlta(evento.valor);
+      break;
+    case TIPO_EVENTO_COOLER_MANUAL:
+      accionarCoolerManual();
+      break;
+    case TIPO_EVENTO_TEMP_NORMAL:
+      accionarClimaTemperaturaNormal(evento.valor);
+      break;
+    case TIPO_EVENTO_TEMP_ERROR:
+      accionarClimaErrorSensor();
+      break;
+    }
+  }
+  break;
 
-    case ESTADO_EMBEDDED_ALERTA_INTRUSION: {
-      switch (evento.tipo) {
-        case TIPO_EVENTO_PUERTA_CERRADA:
-          Serial.println("\n[FSM]: ALERTA_INTRUSION | [EVENTO]: PUERTA CERRADA -> REPOSO");
-          accionarModoReposo();
-          estadoActual = ESTADO_EMBEDDED_REPOSO;
-          break;
-        case TIPO_EVENTO_TARJETA_VALIDA:
-          Serial.println("\n[FSM]: ALERTA_INTRUSION | [EVENTO]: TARJETA VALIDA (DESARME) -> PUERTA_ABIERTA");
-          accionarModoPuertaAbierta();
-          estadoActual = ESTADO_EMBEDDED_PUERTA_ABIERTA;
-          break;
-        case TIPO_EVENTO_TICK_SIRENA:
-          accionarPulsoSirena();
-          break;
-        case TIPO_EVENTO_TARJETA_LEYENDO:
-          accionarAvisoValidandoTarjeta();
-          break;
-        case TIPO_EVENTO_TARJETA_DENEGADA:
-          accionarAvisoTarjetaDenegada();
-          break;
-        case TIPO_EVENTO_SIN_SERVIDOR:
-          accionarAvisoSinServidor();
-          break;
-        case TIPO_EVENTO_FIN_MENSAJE_LCD:
-          restaurarPantallaEstadoIntrusion();
-          break;
-        case TIPO_EVENTO_TEMP_ALTA:
-          accionarClimaTemperaturaAlta(evento.valor);
-          break;
-        case TIPO_EVENTO_TEMP_NORMAL:
-          accionarClimaTemperaturaNormal(evento.valor);
-          break;
-        case TIPO_EVENTO_TEMP_ERROR:
-          accionarClimaErrorSensor();
-          break;
-      }
-    } break;
+  case ESTADO_EMBEDDED_ALERTA_INTRUSION:
+  {
+    switch (evento.tipo)
+    {
+    case TIPO_EVENTO_PUERTA_CERRADA:
+      Serial.println("\n[FSM]: ALERTA_INTRUSION | [EVENTO]: PUERTA CERRADA -> REPOSO");
+      accionarModoReposo();
+      estadoActual = ESTADO_EMBEDDED_REPOSO;
+      break;
+    case TIPO_EVENTO_TARJETA_VALIDA:
+      Serial.println("\n[FSM]: ALERTA_INTRUSION | [EVENTO]: TARJETA VALIDA (DESARME) -> PUERTA_ABIERTA");
+      accionarModoPuertaAbierta();
+      estadoActual = ESTADO_EMBEDDED_PUERTA_ABIERTA;
+      break;
+    case TIPO_EVENTO_TICK_SIRENA:
+      accionarPulsoSirena();
+      break;
+    case TIPO_EVENTO_TARJETA_LEYENDO:
+      accionarAvisoValidandoTarjeta();
+      break;
+    case TIPO_EVENTO_TARJETA_DENEGADA:
+      accionarAvisoTarjetaDenegada();
+      break;
+    case TIPO_EVENTO_SIN_SERVIDOR:
+      accionarAvisoSinServidor();
+      break;
+    case TIPO_EVENTO_FIN_MENSAJE_LCD:
+      restaurarPantallaEstadoIntrusion();
+      break;
+    case TIPO_EVENTO_TEMP_ALTA:
+      accionarClimaTemperaturaAlta(evento.valor);
+      break;
+    case TIPO_EVENTO_COOLER_MANUAL:
+      accionarCoolerManual();
+      break;
+    case TIPO_EVENTO_TEMP_NORMAL:
+      accionarClimaTemperaturaNormal(evento.valor);
+      break;
+    case TIPO_EVENTO_TEMP_ERROR:
+      accionarClimaErrorSensor();
+      break;
+    }
+  }
+  break;
   }
 }
 
-inline void tareaFSM(void *parameter) {
+inline void tareaFSM(void *parameter)
+{
   stEvento evento;
-  while (true) {
-    if (xQueueReceive(colaEventos, &evento, portMAX_DELAY) == pdTRUE) {
+  while (true)
+  {
+    if (xQueueReceive(colaEventos, &evento, portMAX_DELAY) == pdTRUE)
+    {
       maquina_estados(evento);
     }
   }
