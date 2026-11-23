@@ -1,6 +1,6 @@
 @file:Suppress("SpellCheckingInspection")
 
-package com.example.infraguard// <-- PON AQUÍ EL MISMO PACKAGE DE TU PROYECTO
+package com.example.infraguard
 
 import com.google.gson.annotations.SerializedName
 import retrofit2.Retrofit
@@ -14,7 +14,8 @@ data class ClimaResponse(
     val temperatura: Float,
     val humedad: Float,
     @field:SerializedName("cooler_activo") val coolerActivo: Boolean,
-    val timestamp: String?
+    val timestamp: String?,
+    @field:SerializedName("cooler_manual") val coolerManual: Boolean = false
 )
 
 data class AccesoItem(
@@ -44,6 +45,10 @@ data class CambiarEstadoRequest(
     val estado: Boolean
 )
 
+data class CoolerRequest(
+    val cooler: String
+)
+
 interface InfraGuardApi {
     @GET("api/clima")
     suspend fun obtenerClima(): ClimaResponse
@@ -62,15 +67,29 @@ interface InfraGuardApi {
 
     @POST("api/remoto/autorizar")
     suspend fun autorizarRemoto(): Any
+
+    @POST("api/remoto/cooler")
+    suspend fun cambiarModoCooler(@Body req: CoolerRequest): Any
 }
 
 object RetrofitClient {
-    // Apunta al puente portproxy de tu Windows en la red local
-    private const val BASE_URL = "http://192.168.0.121:1880/"
+    var ipServidor: String = "192.168.0.120"
+        private set
 
-    val api: InfraGuardApi by lazy {
-        Retrofit.Builder()
-            .baseUrl(BASE_URL)
+    var api: InfraGuardApi = crearCliente(ipServidor)
+        private set
+
+    fun actualizarIp(nuevaIp: String) {
+        val ipLimpia = nuevaIp.trim()
+        if (ipLimpia.isNotEmpty()) {
+            ipServidor = ipLimpia
+            api = crearCliente(ipLimpia)
+        }
+    }
+
+    private fun crearCliente(ip: String): InfraGuardApi {
+        return Retrofit.Builder()
+            .baseUrl("http://$ip:1880/")
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(InfraGuardApi::class.java)
