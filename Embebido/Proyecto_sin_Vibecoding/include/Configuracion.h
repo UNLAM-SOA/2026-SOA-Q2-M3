@@ -5,12 +5,14 @@
 
 #define SSID_WIFI                       "Personal 2.4 GHZ"
 #define PASSWORD_WIFI                   "00442952504"
-#define SERVIDOR_MQTT                   "192.168.0.121"
+#define SERVIDOR_MQTT                   "192.168.0.120"
 #define PUERTO_MQTT                     1883
 #define ID_CLIENTE_MQTT                 "ESP32_InfraGuard"
 #define TOPIC_MQTT_CONSULTA             "acceso/tarjeta/consulta"
 #define TOPIC_MQTT_RESPUESTA            "acceso/tarjeta/respuesta"
+#define TOPIC_MQTT_COOLER               "control/cooler"
 #define TOPIC_MQTT_AMBIENTE             "rack/sensores/ambiente"
+volatile bool COOLER_MANUAL = false;
 
 #define PIN_PUERTA                      14
 #define PIN_BUZZER                      27
@@ -103,6 +105,7 @@ enum eTipoEvento {
   TIPO_EVENTO_PUERTA_ABIERTA       = 4000,
   TIPO_EVENTO_PUERTA_CERRADA       = 5000,
   TIPO_EVENTO_TEMP_ALTA            = 6000,
+  TIPO_EVENTO_COOLER_MANUAL        = 6500,
   TIPO_EVENTO_TEMP_NORMAL          = 7000,
   TIPO_EVENTO_TEMP_ERROR           = 7100,
   TIPO_EVENTO_TICK_SIRENA          = 8000
